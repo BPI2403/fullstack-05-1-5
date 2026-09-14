@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: 0 0% 100%;
+  --color-foreground: 224 71% 4%;
+  --color-card: 0 0% 100%;
+  --color-card-foreground: 224 71% 4%;
+  --color-popover: 0 0% 100%;
+  --color-popover-foreground: 224 71% 4%;
+  --color-primary: 265 89% 65%;
+  --color-primary-foreground: 224 71% 94%;
+  --color-muted: 224 71% 96%;
+  --color-muted-foreground: 224 71% 26%;
+  --color-accent: 265 89% 65%;
+  --color-accent-foreground: 224 71% 4%;
+  --color-destructive: 0 84% 61%;
+  --color-destructive-foreground: 0 0% 100%;
+  --color-border: 224 71% 90%;
+  --color-input: 224 71% 90%;
+  --color-ring: 265 89% 65%;
+  --color-secondary: 224 71% 96%;
+  --color-secondary-foreground: 224 71% 9%;
+  --color-selection: 224 71% 90%;
+
+  --radius: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-background: 224 71% 4%;
+    --color-foreground: 0 0% 93%;
+    --color-card: 224 71% 8%;
+    --color-card-foreground: 0 0% 93%;
+    --color-popover: 224 71% 8%;
+    --color-popover-foreground: 0 0% 93%;
+    --color-muted: 224 71% 15%;
+    --color-muted-foreground: 224 71% 65%;
+    --color-border: 224 71% 20%;
+    --color-input: 224 71% 20%;
+    --color-secondary: 224 71% 18%;
+    --color-secondary-foreground: 0 0% 93%;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+* {
+  border-color: var(--border);
 }

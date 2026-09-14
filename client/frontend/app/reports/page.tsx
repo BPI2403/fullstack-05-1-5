@@ -1,13 +1,25 @@
 "use client";
 
-import BarChart from "@/components/bar-chart";
-import PageHeader from "@/components/page-header";
-import {
-  CATEGORIES,
-  MONTHLY_TRANSACTIONS,
-  formatAmount,
-} from "@/lib/data";
 import { useState } from "react";
+import { CATEGORIES, MONTHLY_TRANSACTIONS, formatAmount } from "@/lib/data";
+import PageHeader from "@/components/page-header";
+import BarChart from "@/components/bar-chart";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Download } from "lucide-react";
 
 type Period = "month" | "quarter" | "year";
 type Format = "csv" | "pdf";
@@ -71,98 +83,107 @@ export default function ReportsPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <section className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-          <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
-            Расходы по категориям
-          </h2>
-          {expensesByCategory.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Нет расходов за выбранный период
-            </p>
-          ) : (
-            <BarChart data={expensesByCategory} categories={CATEGORIES} />
-          )}
-        </section>
+        <BarChart
+          title="Расходы по категориям"
+          data={expensesByCategory}
+          categories={CATEGORIES}
+        />
 
-        <section className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-          <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
-            Динамика доходов / расходов
-          </h2>
-          <ul className="divide-y divide-gray-200 dark:divide-gray-800">
-            <li className="flex justify-between py-2">
-              <span className="text-gray-600 dark:text-gray-300">Доходы</span>
-              <span className="text-emerald-600 font-medium">
-                + {formatAmount(incomeTotal)} ₽
-              </span>
-            </li>
-            <li className="flex justify-between py-2">
-              <span className="text-gray-600 dark:text-gray-300">Расходы</span>
-              <span className="text-red-600 font-medium">
-                - {formatAmount(expenseTotal)} ₽
-              </span>
-            </li>
-            <li className="flex justify-between py-2 font-semibold">
-              <span className="text-gray-900 dark:text-gray-100">Итого</span>
-              <span
-                className={
-                  incomeTotal - expenseTotal >= 0
-                    ? "text-emerald-600"
-                    : "text-red-600"
-                }
-              >
-                {incomeTotal - expenseTotal >= 0 ? "+" : "-"} {" "}
-                {formatAmount(Math.abs(incomeTotal - expenseTotal))} ₽
-              </span>
-            </li>
-          </ul>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Динамика доходов / расходов</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-border">
+              <li className="flex justify-between py-2">
+                <span className="text-muted-foreground">Доходы</span>
+                <span className="text-emerald-600 font-medium">
+                  + {formatAmount(incomeTotal)} ₽
+                </span>
+              </li>
+              <li className="flex justify-between py-2">
+                <span className="text-muted-foreground">Расходы</span>
+                <span className="text-red-600 font-medium">
+                  - {formatAmount(expenseTotal)} ₽
+                </span>
+              </li>
+              <li className="flex justify-between py-2 font-semibold">
+                <span>Итог</span>
+                <span
+                  className={
+                    incomeTotal - expenseTotal >= 0
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }
+                >
+                  {incomeTotal - expenseTotal >= 0 ? "+" : "-"} {" "}
+                  {formatAmount(Math.abs(incomeTotal - expenseTotal))} ₽
+                </span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
       </div>
 
-      <section className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-        <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
-          Экспорт отчёта
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-              Период
-            </label>
-            <select
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as Period)}
-            >
-              <option value="month">{periodLabel.month}</option>
-              <option value="quarter">{periodLabel.quarter}</option>
-              <option value="year">{periodLabel.year}</option>
-            </select>
+      <Card>
+        <CardHeader>
+          <CardTitle>Экспорт отчёта</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">
+                Период
+              </label>
+              <Select
+                value={period}
+                onValueChange={(v) => setPeriod(v as Period)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Период" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectLabel>Период</SelectLabel>
+                  <SelectItem value="month">{periodLabel.month}</SelectItem>
+                  <SelectItem value="quarter">
+                    {periodLabel.quarter}
+                  </SelectItem>
+                  <SelectItem value="year">{periodLabel.year}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">
+                Формат
+              </label>
+              <Select
+                value={format}
+                onValueChange={(v) => setFormat(v as Format)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Формат" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectLabel>Формат</SelectLabel>
+                  <SelectItem value="csv">{formatLabel.csv}</SelectItem>
+                  <SelectItem value="pdf">{formatLabel.pdf}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2 flex items-end">
+              <span className="text-xs text-muted-foreground">
+                Экспорт за {periodLabel[period]} в формате {formatLabel[format]}
+              </span>
+            </div>
+            <div className="sm:col-span-1 flex items-end justify-end">
+              <Button onClick={download}>
+                <Download className="h-4 w-4 mr-2" />
+                Скачать
+              </Button>
+            </div>
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-              Формат
-            </label>
-            <select
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
-              value={format}
-              onChange={(e) => setFormat(e.target.value as Format)}
-            >
-              <option value="csv">{formatLabel.csv}</option>
-              <option value="pdf">{formatLabel.pdf}</option>
-            </select>
-          </div>
-          <div className="sm:col-span-2 flex gap-3 items-end">
-            <button
-              onClick={download}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-            >
-              Скачать
-            </button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Экспорт за {periodLabel[period]} в формате {formatLabel[format]}
-            </span>
-          </div>
-        </div>
-      </section>
+        </CardContent>
+      </Card>
     </div>
   );
 }

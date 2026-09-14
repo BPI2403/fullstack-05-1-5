@@ -1,37 +1,32 @@
 import { CATEGORIES_BY_ID } from "@/lib/data";
+import { Badge } from "@/components/ui/badge";
 
 interface CategoryBadgeProps {
   categoryId?: string;
+  className?: string;
 }
 
-export default function CategoryBadge({ categoryId }: CategoryBadgeProps) {
+export default function CategoryBadge({
+  categoryId,
+  className,
+}: CategoryBadgeProps) {
   const category = categoryId ? CATEGORIES_BY_ID[categoryId] : undefined;
 
   if (!category) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+      <Badge variant="outline" className={className}>
         —
-      </span>
+      </Badge>
     );
   }
 
-  const bg =
-    category.type === "income" ? "bg-emerald-100" : "bg-red-100";
-  const fg =
-    category.type === "income" ? "text-emerald-800" : "text-red-800";
-
   return (
-    <span
-      className={
-        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium" +
-        " " +
-        bg +
-        " " +
-        fg
-      }
+    <Badge
+      variant={category.type === "income" ? "default" : "secondary"}
+      className={className}
     >
-      <span>{category.icon}</span>
+      <span className="mr-1">{category.icon}</span>
       {category.name}
-    </span>
+    </Badge>
   );
 }

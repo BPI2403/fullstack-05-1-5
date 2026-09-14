@@ -1,26 +1,46 @@
 "use client";
 
-import PageHeader from "@/components/page-header";
-import { CATEGORIES } from "@/lib/data";
-import { Category as CategoryType } from "@/lib/types";
 import { useState } from "react";
+import { CATEGORIES } from "@/lib/data";
+import { Category } from "@/lib/types";
+import CategoryForm from "@/components/category-form";
+import PageHeader from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  dropdownItemClass,
+} from "@/components/ui/dropdown-menu";
+import { EllipsisVertical } from "lucide-react";
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<CategoryType[]>(CATEGORIES);
-  const [name, setName] = useState("");
-  const [type, setType] = useState<"income" | "expense">("expense");
+  const [categories, setCategories] = useState<Category[]>(CATEGORIES);
+  const [formOpen, setFormOpen] = useState(false);
 
-  const addCategory = () => {
-    if (!name.trim()) return;
-    const newCategory: CategoryType = {
+  const addCategory = (values: {
+    name: string;
+    type: "income" | "expense";
+    icon: string;
+  }) => {
+    const newCategory: Category = {
       id: `cat-${Date.now()}`,
-      name: name.trim(),
-      type,
-      icon: "📦",
-      color: type === "income" ? "#10b981" : "#ef4444",
+      ...values,
+      color: values.type === "income" ? "#10b981" : "#ef4444",
     };
     setCategories([newCategory, ...categories]);
-    setName("");
+    setFormOpen(false);
   };
 
   const deleteCategory = (id: string) => {
@@ -35,119 +55,108 @@ export default function CategoriesPage() {
       <PageHeader
         title="Категории"
         description="Управление категориями доходов и расходов"
+        action={
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Добавить категорию
+          </Button>
+        }
       />
 
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
-          Добавить категорию
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-          <div>
-            <input
-              type="text"
-              placeholder="Название"
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div>
-            <select
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
-              value={type}
-              onChange={(e) => setType(e.target.value as "income" | "expense")}
-            >
-              <option value="income">Доход</option>
-              <option value="expense">Расход</option>
-            </select>
-          </div>
-          <div className="sm:col-span-1">
-            <select
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
-              defaultValue="🍽️"
-            >
-              <option>🍽️</option>
-              <option>🚇</option>
-              <option>🎮</option>
-              <option>🏠</option>
-              <option>💼</option>
-              <option>🎁</option>
-              <option>📦</option>
-            </select>
-          </div>
-          <button
-            onClick={addCategory}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-          >
-            Сохранить
-          </button>
-        </div>
-      </div>
+      <CategoryForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSubmit={addCategory}
+        title="Новая категория"
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CategoryList
-          title="Доходы"
-          items={incomes}
-          onDelete={deleteCategory}
-        />
-        <CategoryList
-          title="Расходы"
-          items={expenses}
-          onDelete={deleteCategory}
-        />
-      </div>
+      <CategoryTable
+        title="Доходы"
+        items={incomes}
+        onDelete={deleteCategory}
+      />
+      <CategoryTable
+        title="Расходы"
+        items={expenses}
+        onDelete={deleteCategory}
+      />
     </div>
   );
 }
 
-interface CategoryListProps {
+interface CategoryTableProps {
   title: string;
-  items: CategoryType[];
+  items: Category[];
   onDelete: (id: string) => void;
 }
 
-function CategoryList({ title, items, onDelete }: CategoryListProps) {
+function CategoryTable({ title, items, onDelete }: CategoryTableProps) {
   return (
-    <section className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-      <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
-        {title}
-      </h2>
-      {items.length === 0 ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Категории не добавлены
-        </p>
-      ) : (
-        <ul className="divide-y divide-gray-200 dark:divide-gray-800">
-          {items.map((c) => (
-            <li
-              key={c.id}
-              className="flex items-center justify-between py-2"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{c.icon}</span>
-                <span className="font-medium">{c.name}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  className="p-1 text-gray-600 hover:text-gray-900"
-                  title="Изменить"
-                >
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(c.id)}
-                  className="p-1 text-red-600 hover:text-red-800"
-                  title="Удалить"
-                >
-                  🗑️
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+    <section className="mb-6">
+      <h2 className="text-lg font-semibold mb-3 text-foreground">{title}</h2>
+      <div className="overflow-x-auto rounded-md border border-border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Категория</TableHead>
+              <TableHead>Тип</TableHead>
+              <TableHead className="text-center">Действия</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="h-20 text-center">
+                  Категории не добавлены
+                </TableCell>
+              </TableRow>
+            ) : (
+              items.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span>{c.icon}</span>
+                      <span className="font-medium">{c.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={
+                        c.type === "income"
+                          ? "text-emerald-600"
+                          : "text-red-600"
+                      }
+                    >
+                      {c.type === "income" ? "Доход" : "Расход"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <EllipsisVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className={dropdownItemClass}>
+                          Изменить
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className={dropdownItemClass}
+                          onSelect={() => onDelete(c.id)}
+                        >
+                          Удалить
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </section>
   );
 }

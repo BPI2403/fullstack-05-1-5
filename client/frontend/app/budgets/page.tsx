@@ -1,26 +1,36 @@
 "use client";
 
-import BudgetProgress from "@/components/budget-progress";
-import PageHeader from "@/components/page-header";
+import { useState } from "react";
 import {
   BUDGETS,
-  CATEGORIES,
   MONTHLY_TRANSACTIONS,
   formatAmount,
 } from "@/lib/data";
-import { Budget as BudgetType } from "@/lib/types";
-import { useState } from "react";
+import { Budget } from "@/lib/types";
+import BudgetProgress from "@/components/budget-progress";
+import PageHeader from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EllipsisVertical, Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  dropdownItemClass,
+} from "@/components/ui/dropdown-menu";
+import BudgetForm from "@/components/budget-form";
+
+function spentByCategory(catId: string) {
+  return MONTHLY_TRANSACTIONS.filter(
+    (t) => t.categoryId === catId,
+  ).reduce((s, t) => s + t.amount, 0);
+}
 
 export default function BudgetsPage() {
-  const [budgets, setBudgets] = useState<readonly BudgetType[]>(BUDGETS);
-  const [limit, setLimit] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-
-  const spentByCategory = (catId: string) =>
-    MONTHLY_TRANSACTIONS.filter((t) => t.categoryId === catId).reduce(
-      (s, t) => s + t.amount,
-      0,
-    );
+  const [budgets, setBudgets] = useState<readonly Budget[]>(BUDGETS);
+  const [formOpen, setFormOpen] = useState(false);
 
   const totalSpent = budgets.reduce(
     (s, b) => s + spentByCategory(b.categoryId),
@@ -29,136 +39,136 @@ export default function BudgetsPage() {
   const totalLimit = budgets.reduce((s, b) => s + b.limit, 0);
   const overallPercent =
     totalLimit > 0 ? Math.min((totalSpent / totalLimit) * 100, 100) : 0;
+  const remaining = totalLimit - totalSpent;
 
-  const expenseCategories = CATEGORIES.filter((c) => c.type === "expense");
-  const availableCategories = expenseCategories.filter(
-    (c) => !budgets.some((b) => b.categoryId === c.id),
-  );
-
-  const addBudget = () => {
-    if (!categoryId || !limit) return;
-    const newBudget: BudgetType = {
+  const addBudget = (values: { categoryId: string; limit: number }) => {
+    const newBudget: Budget = {
       id: `b-${Date.now()}`,
-      categoryId,
-      limit: Number(limit),
+      ...values,
       month: "2025-09",
     };
     setBudgets([newBudget, ...budgets]);
-    setLimit("");
-    setCategoryId("");
+    setFormOpen(false);
   };
 
   const deleteBudget = (id: string) => {
     setBudgets(budgets.filter((b) => b.id !== id));
   };
 
+  const sorted = budgets
+    .slice()
+    .sort(
+      (a, b) =>
+        spentByCategory(b.categoryId) - spentByCategory(a.categoryId),
+    );
+
   return (
     <div className="p-6">
       <PageHeader
         title="Бюджеты"
         description="Настройка и отслеживание месячных лимитов"
+        action={
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Добавить бюджет
+          </Button>
+        }
+      />
+
+      <BudgetForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSubmit={addBudget}
+        title="Новый бюджет"
+        existingCategoryIds={budgets.map((b) => b.categoryId)}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Stat value={formatAmount(totalLimit)} label="Общий лимит" icon="🎯" />
-        <Stat value={formatAmount(totalSpent)} label="Потрачено" icon="📊" />
-        <Stat value={`${Math.round(overallPercent)}%`} label="Выполнение" icon="📈" />
+        <StatCardInternal
+          title="Общий лимит"
+          value={`${formatAmount(totalLimit)} ₽`}
+        />
+        <StatCardInternal
+          title="Потрачено"
+          value={`${formatAmount(totalSpent)} ₽`}
+        />
+        <StatCardInternal
+          title="Выполнение"
+          value={`${Math.round(overallPercent)}%`}
+        />
       </div>
 
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
-          Добавить бюджет
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-          <div>
-            <select
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              <option value="">Выберите категорию</option>
-              {availableCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.icon} {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="sm:col-span-2">
-            <input
-              type="number"
-              placeholder="Лимит (₽)"
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
-              value={limit}
-              onChange={(e) => setLimit(e.target.value)}
-            />
-          </div>
-          <button
-            onClick={addBudget}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-          >
-            Сохранить
-          </button>
+      {sorted.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Бюджеты не заданы</p>
+      ) : (
+        <div className="space-y-4">
+          {sorted.map((budget) => (
+            <Card key={budget.id}>
+              <CardContent className="pt-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <BudgetProgress
+                      categoryId={budget.categoryId}
+                      spent={spentByCategory(budget.categoryId)}
+                      limit={budget.limit}
+                    />
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <EllipsisVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem className={dropdownItemClass}>
+                        Изменить
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className={dropdownItemClass}
+                        onSelect={() => deleteBudget(budget.id)}
+                      >
+                        Удалить
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                {remaining < 0 ? (
+                  <p className="mt-2 text-xs text-destructive">
+                    Общий превышен на{" "}
+                    {formatAmount(Math.abs(remaining))} ₽
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Осталось расходовать {formatAmount(remaining)} ₽
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </div>
-
-      <div className="space-y-4">
-        {budgets.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Бюджеты не заданы
-          </p>
-        ) : (
-          budgets.map((budget) => (
-            <div
-              key={budget.id}
-              className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between gap-4"
-            >
-              <div className="flex-1 min-w-0">
-                <BudgetProgress
-                  categoryId={budget.categoryId}
-                  spent={spentByCategory(budget.categoryId)}
-                  limit={budget.limit}
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  className="p-1 text-gray-600 hover:text-gray-900"
-                  title="Изменить"
-                >
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteBudget(budget.id)}
-                  className="p-1 text-red-600 hover:text-red-800"
-                  title="Удалить"
-                >
-                  🗑️
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      )}
     </div>
   );
 }
 
-interface StatProps {
-  label: string;
+function StatCardInternal({
+  title,
+  value,
+}: {
+  title: string;
   value: string;
-  icon: string;
-}
-
-function Stat({ label, value, icon }: StatProps) {
+}) {
   return (
-    <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 p-4 text-center">
-      <span className="text-2xl mb-1 block">{icon}</span>
-      <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-        {value}
-      </div>
-      <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
+      </CardContent>
+    </Card>
   );
 }
