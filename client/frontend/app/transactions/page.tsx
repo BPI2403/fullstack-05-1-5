@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/table";
 import { EllipsisVertical } from "lucide-react";
 import TransactionForm from "@/components/transaction-form";
+import NoSSR from "@/components/ui/no-ssr";
 
 type FilterType = "all" | "income" | "expense";
 
@@ -49,6 +50,7 @@ export default function TransactionsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const filtered = transactions
     .filter((t) => {
@@ -91,6 +93,41 @@ export default function TransactionsPage() {
     setFormOpen(false);
   };
 
+  const updateTransaction = (id: string, values: {
+    type: "income" | "expense";
+    amount: number;
+    categoryId: string;
+    date: string;
+    description: string;
+  }) => {
+    setTransactions(transactions.map(t => t.id === id ? { ...t, ...values } : t));
+    setFormOpen(false);
+    setEditingTransaction(null);
+  };
+
+  const deleteTransaction = (id: string) => {
+    setTransactions(transactions.filter(t => t.id !== id));
+  };
+
+  const handleEdit = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setFormOpen(true);
+  };
+
+  const handleSubmit = (values: {
+    type: "income" | "expense";
+    amount: number;
+    categoryId: string;
+    date: string;
+    description: string;
+  }) => {
+    if (editingTransaction) {
+      updateTransaction(editingTransaction.id, values);
+    } else {
+      addTransaction(values);
+    }
+  };
+
   const expenseCategories = CATEGORIES.filter((c) => c.type === "expense");
 
   return (
@@ -113,38 +150,42 @@ export default function TransactionsPage() {
           className="sm:max-w-xs"
         />
         <div className="flex flex-wrap gap-2">
-          <Select
-            value={typeFilter}
-            onValueChange={(v) => setTypeFilter(v as FilterType)}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Тип" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectLabel>Тип операции</SelectLabel>
-              <SelectItem value="all">Все типы</SelectItem>
-              <SelectItem value="income">Доходы</SelectItem>
-              <SelectItem value="expense">Расходы</SelectItem>
-            </SelectContent>
-          </Select>
+          <NoSSR fallback={<div className="h-10 w-[140px] rounded-md border border-input bg-muted" />}>
+            <Select
+              value={typeFilter}
+              onValueChange={(v) => setTypeFilter(v as FilterType)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Тип" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectLabel>Тип операции</SelectLabel>
+                <SelectItem value="all">Все типы</SelectItem>
+                <SelectItem value="income">Доходы</SelectItem>
+                <SelectItem value="expense">Расходы</SelectItem>
+              </SelectContent>
+            </Select>
+          </NoSSR>
 
-          <Select
-            value={categoryFilter}
-            onValueChange={setCategoryFilter}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Категория" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectLabel>Категории</SelectLabel>
-              <SelectItem value="all">Все категории</SelectItem>
-              {expenseCategories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.icon} {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <NoSSR fallback={<div className="h-10 w-[160px] rounded-md border border-input bg-muted" />}>
+            <Select
+              value={categoryFilter}
+              onValueChange={setCategoryFilter}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Категория" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectLabel>Категории</SelectLabel>
+                <SelectItem value="all">Все категории</SelectItem>
+                {expenseCategories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.icon} {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </NoSSR>
 
           <Input
             type="date"
@@ -167,8 +208,16 @@ export default function TransactionsPage() {
       <TransactionForm
         open={formOpen}
         onOpenChange={setFormOpen}
-        onSubmit={addTransaction}
-        title="Новая операция"
+        onSubmit={handleSubmit}
+        title={editingTransaction ? "Изменить операцию" : "Новая операция"}
+        defaultValues={editingTransaction ? {
+          type: editingTransaction.type,
+          amount: String(editingTransaction.amount),
+          categoryId: editingTransaction.categoryId,
+          date: editingTransaction.date,
+          description: editingTransaction.description ?? "",
+        } : undefined}
+        isEditing={!!editingTransaction}
       />
 
       <div className="overflow-x-auto rounded-md border border-border bg-card">
@@ -226,14 +275,18 @@ export default function TransactionsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           className={dropdownItemClass}
-                          onSelect={() => {}}
+                          onSelect={() => handleEdit(t)}
                         >
                           Изменить
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className={dropdownItemClass}
-                          onSelect={() => {}}
+                          onSelect={() => {
+                            if (confirm("Удалить эту транзакцию?")) {
+                              deleteTransaction(t.id);
+                            }
+                          }}
                         >
                           Удалить
                         </DropdownMenuItem>

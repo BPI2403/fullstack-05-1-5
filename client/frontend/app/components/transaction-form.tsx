@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { CATEGORIES } from "@/lib/data";
 import {
@@ -43,6 +43,7 @@ export interface TransactionFormProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   title?: string;
+  isEditing?: boolean;
 }
 
 export default function TransactionForm({
@@ -52,6 +53,7 @@ export default function TransactionForm({
   open,
   onOpenChange,
   title = "Новая операция",
+  isEditing = false,
 }: TransactionFormProps) {
   const [type, setType] = useState(defaultValues?.type ?? "expense");
   const [amount, setAmount] = useState(defaultValues?.amount ?? "");
@@ -64,6 +66,24 @@ export default function TransactionForm({
   const [description, setDescription] = useState(
     defaultValues?.description ?? "",
   );
+
+  // Reset form when dialog opens/closes or when defaultValues change
+  useEffect(() => {
+    if (open && defaultValues) {
+      setType(defaultValues.type ?? "expense");
+      setAmount(defaultValues.amount ?? "");
+      setCategoryId(defaultValues.categoryId ?? "");
+      setDate(defaultValues.date ?? new Date().toISOString().slice(0, 10));
+      setDescription(defaultValues.description ?? "");
+    } else if (!open) {
+      // Reset to defaults when closed
+      setType("expense");
+      setAmount("");
+      setCategoryId("");
+      setDate(new Date().toISOString().slice(0, 10));
+      setDescription("");
+    }
+  }, [open, defaultValues]);
 
   const handleSubmit = () => {
     const num = Number(amount);
