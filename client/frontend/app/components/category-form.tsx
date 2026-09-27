@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import {
   Dialog,
@@ -35,6 +35,7 @@ export interface CategoryFormProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   title?: string;
+  isEditing?: boolean;
 }
 
 const ICONS = ["🍽️", "🚇", "🎮", "🏠", "👕", "💼", "🎁", "📦"];
@@ -46,12 +47,25 @@ export default function CategoryForm({
   open,
   onOpenChange,
   title = "Новая категория",
+  isEditing = false,
 }: CategoryFormProps) {
   const [name, setName] = useState(defaultValues?.name ?? "");
   const [type, setType] = useState<"income" | "expense">(
     defaultValues?.type ?? "expense",
   );
   const [icon, setIcon] = useState(defaultValues?.icon ?? "📦");
+
+  useEffect(() => {
+    if (open && defaultValues) {
+      setName(defaultValues.name ?? "");
+      setType(defaultValues.type ?? "expense");
+      setIcon(defaultValues.icon ?? "📦");
+    } else if (!open) {
+      setName("");
+      setType("expense");
+      setIcon("📦");
+    }
+  }, [open, defaultValues]);
 
   const handleSubmit = () => {
     if (!name.trim()) return;

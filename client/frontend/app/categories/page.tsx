@@ -28,6 +28,7 @@ import { EllipsisVertical } from "lucide-react";
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>(CATEGORIES);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   const addCategory = (values: {
     name: string;
@@ -43,8 +44,35 @@ export default function CategoriesPage() {
     setFormOpen(false);
   };
 
+  const updateCategory = (id: string, values: {
+    name: string;
+    type: "income" | "expense";
+    icon: string;
+  }) => {
+    setCategories(categories.map(c => c.id === id ? { ...c, ...values, color: values.type === "income" ? "#10b981" : "#ef4444" } : c));
+    setFormOpen(false);
+    setEditingCategory(null);
+  };
+
   const deleteCategory = (id: string) => {
     setCategories(categories.filter((c) => c.id !== id));
+  };
+
+  const handleEdit = (category: Category) => {
+    setEditingCategory(category);
+    setFormOpen(true);
+  };
+
+  const handleSubmit = (values: {
+    name: string;
+    type: "income" | "expense";
+    icon: string;
+  }) => {
+    if (editingCategory) {
+      updateCategory(editingCategory.id, values);
+    } else {
+      addCategory(values);
+    }
   };
 
   const incomes = categories.filter((c) => c.type === "income");
@@ -66,19 +94,27 @@ export default function CategoriesPage() {
       <CategoryForm
         open={formOpen}
         onOpenChange={setFormOpen}
-        onSubmit={addCategory}
-        title="Новая категория"
+        onSubmit={handleSubmit}
+        title={editingCategory ? "Изменить категорию" : "Новая категория"}
+        defaultValues={editingCategory ? {
+          name: editingCategory.name,
+          type: editingCategory.type,
+          icon: editingCategory.icon,
+        } : undefined}
+        isEditing={!!editingCategory}
       />
 
       <CategoryTable
         title="Доходы"
         items={incomes}
         onDelete={deleteCategory}
+        onEdit={handleEdit}
       />
       <CategoryTable
         title="Расходы"
         items={expenses}
         onDelete={deleteCategory}
+        onEdit={handleEdit}
       />
     </div>
   );
@@ -88,9 +124,10 @@ interface CategoryTableProps {
   title: string;
   items: Category[];
   onDelete: (id: string) => void;
+  onEdit: (category: Category) => void;
 }
 
-function CategoryTable({ title, items, onDelete }: CategoryTableProps) {
+function CategoryTable({ title, items, onDelete, onEdit }: CategoryTableProps) {
   return (
     <section className="mb-6">
       <h2 className="text-lg font-semibold mb-3 text-foreground">{title}</h2>
@@ -138,7 +175,10 @@ function CategoryTable({ title, items, onDelete }: CategoryTableProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className={dropdownItemClass}>
+                        <DropdownMenuItem
+                          className={dropdownItemClass}
+                          onSelect={() => onEdit(c)}
+                        >
                           Изменить
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
