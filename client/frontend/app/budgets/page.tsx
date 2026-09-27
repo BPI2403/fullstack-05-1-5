@@ -31,6 +31,7 @@ function spentByCategory(catId: string) {
 export default function BudgetsPage() {
   const [budgets, setBudgets] = useState<readonly Budget[]>(BUDGETS);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 
   const totalSpent = budgets.reduce(
     (s, b) => s + spentByCategory(b.categoryId),
@@ -51,8 +52,27 @@ export default function BudgetsPage() {
     setFormOpen(false);
   };
 
+  const updateBudget = (id: string, values: { categoryId: string; limit: number }) => {
+    setBudgets(budgets.map(b => b.id === id ? { ...b, ...values } : b));
+    setFormOpen(false);
+    setEditingBudget(null);
+  };
+
   const deleteBudget = (id: string) => {
     setBudgets(budgets.filter((b) => b.id !== id));
+  };
+
+  const handleEdit = (budget: Budget) => {
+    setEditingBudget(budget);
+    setFormOpen(true);
+  };
+
+  const handleSubmit = (values: { categoryId: string; limit: number }) => {
+    if (editingBudget) {
+      updateBudget(editingBudget.id, values);
+    } else {
+      addBudget(values);
+    }
   };
 
   const sorted = budgets
@@ -78,9 +98,14 @@ export default function BudgetsPage() {
       <BudgetForm
         open={formOpen}
         onOpenChange={setFormOpen}
-        onSubmit={addBudget}
-        title="Новый бюджет"
-        existingCategoryIds={budgets.map((b) => b.categoryId)}
+        onSubmit={handleSubmit}
+        title={editingBudget ? "Изменить бюджет" : "Новый бюджет"}
+        existingCategoryIds={budgets.filter(b => b.id !== editingBudget?.id).map((b) => b.categoryId)}
+        defaultValues={editingBudget ? {
+          categoryId: editingBudget.categoryId,
+          limit: editingBudget.limit,
+        } : undefined}
+        isEditing={!!editingBudget}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -120,7 +145,10 @@ export default function BudgetsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className={dropdownItemClass}>
+                      <DropdownMenuItem
+                        className={dropdownItemClass}
+                        onSelect={() => handleEdit(budget)}
+                      >
                         Изменить
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { CATEGORIES } from "@/lib/data";
 import {
@@ -33,6 +33,7 @@ export interface BudgetFormProps {
   onOpenChange?: (open: boolean) => void;
   title?: string;
   existingCategoryIds?: string[];
+  isEditing?: boolean;
 }
 
 export default function BudgetForm({
@@ -43,6 +44,7 @@ export default function BudgetForm({
   onOpenChange,
   title = "Новый бюджет",
   existingCategoryIds = [],
+  isEditing = false,
 }: BudgetFormProps) {
   const [categoryId, setCategoryId] = useState(
     defaultValues?.categoryId ?? "",
@@ -53,6 +55,16 @@ export default function BudgetForm({
     (c) =>
       c.type === "expense" && !existingCategoryIds.includes(c.id),
   );
+
+  useEffect(() => {
+    if (open && defaultValues) {
+      setCategoryId(defaultValues.categoryId ?? "");
+      setLimit(defaultValues.limit ? String(defaultValues.limit) : "");
+    } else if (!open) {
+      setCategoryId("");
+      setLimit("");
+    }
+  }, [open, defaultValues]);
 
   const handleSubmit = () => {
     const num = Number(limit);
