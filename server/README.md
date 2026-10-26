@@ -1,103 +1,136 @@
 # Backend — Личный финучёт API
 
-Backend-приложение на **FastAPI** + **SQLAlchemy** (async) + **PostgreSQL** для личного учёта финансов: доходы/расходы, категории и бюджеты.
+Backend-приложение на **FastAPI** + **SQLAlchemy 2 (async)** + **PostgreSQL** для личного учёта финансов: доходы/расходы, категории и бюджеты.
 
-## Структура проекта (разделение по назначению)
+Архитектура — слоистая (layered), production-ready:
+
+```
+Presentation (app/api)   →  Service (app/services)  →  Repository (app/repositories)  →  Models (app/models)
+        HTTP, DI, схемы          бизнес-правила, UoW          запросы к БД                    таблицы SQLAlchemy
+```
+
+## Структура проекта
 
 ```
 server/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py              # Фабрика приложения, CORS, роутеры, lifespan
-│   ├── config.py            # Конфигурация (pydantic-settings, переменные окружения)
-│   ├── database.py          # Движок, сессии SQLAlchemy, база declarative
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── base.py          # SQLAlchemy ORM-модели (Category, Transaction, Budget)
-│   ├── schemas/
-│   │   ├── __init__.py
-│   │   ├── category.py      # Pydantic-схемы категории (запрос/ответ)
-│   │   ├── transaction.py   # Pydantic-схемы транзакции
-│   │   └── budget.py        # Pydantic-схемы бюджета
-│   ├── crud/
-│   │   ├── __init__.py
-│   │   ├── exceptions.py    # Исключения бизнес-логики (NotFoundError, DuplicateError)
-│   │   ├── category.py      # CRUD категории
-│   │   ├── transaction.py   # CRUD транзакций
-│   │   └── budget.py        # CRUD бюджетов
-│   └── router/
-│       ├── __init__.py
-│       ├── categories.py    # API-маршруты категорий
-│       ├── transactions.py  # API-маршруты транзакций
-│       └── budgets.py       # API-маршруты бюджетов
-├── tests/
-│   ├── conftest.py          # Фикстуры БД (in-memory SQLite) и HTTP-клиента
+│   ├── main.py                  # Фабрика приложения (composition root): CORS, роутеры, lifespan
+│   ├── api/                     # Слой представления (Presentation)
+│   │   ├── deps.py              # DI: Unit of Work и сервисы через Depends
+│   │   ├── health.py            # Health-check пробы (/health/live, /health/ready)
+│   │   └── v1/
+│   │       ├── router.py        # Агрегатор маршрутов API v1
+│   │       ├── categories.py    # Маршруты категорий
+│   │       ├── transactions.py  # Маршруты транзакций
+│   │       └── budgets.py       # Маршруты бюджетов
+│   ├── services/                # Слой бизнес-логики (Service)
+│   │   ├── category.py          # Правила категорий (уникальность и т.д.)
+│   │   ├── transaction.py       # Правила транзакций (проверка FK и т.д.)
+│   │   └── budget.py            # Правила бюджетов (1 бюджет на категорию+месяц)
+│   ├── repositories/            # Слой доступа к данным (Repository)
+│   │   ├── base.py              # Generic-репозиторий (get/list/add/delete)
+│   │   ├── category.py
+│   │   ├── transaction.py
+│   │   └── budget.py
+│   ├── db/                      # Инфраструктура БД
+│   │   ├── base.py              # DeclarativeBase + конвенция имён ограничений
+│   │   ├── session.py           # Асинхронный движок и фабрика сессий
+│   │   └── unit_of_work.py      # Unit of Work: единая транзакция на операцию
+│   ├── models/                  # Модели SQLAlchemy
+│   │   ├── base.py              # Примеси: первичный ключ, timestamps
+│   │   ├── enums.py             # FinanceType (income | expense)
+│   │   ├── category.py
+│   │   ├── transaction.py
+│   │   └── budget.py
+│   ├── schemas/                 # Схемы Pydantic (валидация запросов/ответов)
+│   │   ├── base.py
+│   │   ├── category.py
+│   │   ├── transaction.py
+│   │   └── budget.py
+│   └── core/                    # Сквозные механизмы
+│       ├── config.py            # Конфигурация (pydantic-settings, .env)
+│       ├── exceptions.py        # Доменные исключения (404/409/400)
+│       ├── exception_handlers.py# Централизованный маппинг исключений → HTTP
+│       └── logging.py           # Настройка логирования
+├── migrations/                  # Alembic-миграции
+│   ├── env.py                   # Асинхронное окружение, URL из настроек приложения
+│   └── versions/                # Версии схемы (initial schema и далее)
+├── tests/                       # Pytest: сервисы + API на in-memory SQLite
+│   ├── conftest.py              # Фикстуры: БД, Unit of Work, HTTP-клиент
 │   ├── test_category.py
 │   ├── test_transaction.py
 │   └── test_budget.py
-├── Dockerfile               # Сборка приложения (uv + python:3.12-slim)
-├── compose.yml              # Docker Compose: app + PostgreSQL
-├── .env.example             # Пример настроек без секретов
-├── .python-version
-├── pyproject.toml           # Зависимости и метаданные проекта (uv)
-├── uv.lock                  # Зафиксированные версии зависимостей
-└── README.md
+├── alembic.ini                  # Конфигурация Alembic (URL берётся из .env)
+├── Dockerfile                   # Multi-stage сборка (uv + python:3.12-slim)
+├── compose.yml                  # Docker Compose: app + PostgreSQL 16
+├── .env.example                 # Пример настроек без секретов
+├── pyproject.toml               # Зависимости и инструменты (uv, ruff, pytest)
+└── uv.lock                      # Зафиксированные версии зависимостей
 ```
-
-### 1.1 Маршруты API → `app/router/*.py`
-### 1.2 Модели SQLAlchemy и схемы валидации → `app/models/*.py`, `app/schemas/*.py`
-### 1.3 Подключение и сессии БД, операции с данными и бизнес-логика → `app/database.py`, `app/crud/*.py`
-### 1.3 Конфигурация приложения → `app/config.py`
 
 ## Модель данных
 
-Определены три связанные таблицы с первичными и внешними ключами:
+Три связанные таблицы с первичными и внешними ключами:
 
 | Таблица | Первичный ключ | Внешние ключи | Описание |
 |---------|---------------|---------------|----------|
-| `categories` | `id` (int, PK) | — | Категория дохода/расхода (имя, тип, иконка, цвет) |
-| `transactions` | `id` (int, PK) | `category_id → categories.id` (ON DELETE CASCADE) | Транзакция (тип, сумма, дата, описание) |
-| `budgets` | `id` (int, PK) | `category_id → categories.id` (ON DELETE CASCADE) | Месячный бюджет/лимит (category_id, limit, месяц `YYYY-MM`) |
+| `categories` | `id` (int, PK) | — | Категория дохода/расхода (name, type, icon, color); уникальна пара (name, type) |
+| `transactions` | `id` (int, PK) | `category_id → categories.id` (ON DELETE CASCADE) | Транзакция (type, amount, date, description) |
+| `budgets` | `id` (int, PK) | `category_id → categories.id` (ON DELETE CASCADE) | Месячный лимит (limit, month `YYYY-MM`); уникальна пара (category_id, month) |
 
 Связи:
-- Категория 1:N Транзакции (при удалении категории каскадно удаляются её транзакции и бюджеты)
-- Категория 1:N Бюджеты (по разным месяцам)
+- **Category 1:N Transaction** — у категории много транзакций.
+- **Category 1:N Budget** — у категории бюджеты на разные месяцы.
+- Удаление категории **каскадно** удаляет её транзакции и бюджеты (ORM `cascade="all, delete-orphan"` + `ON DELETE CASCADE` в БД).
+
+Типы (`income`/`expense`) хранятся как VARCHAR с CHECK-ограничением через `Enum(FinanceType)` — значения валидируются и на уровне API (Pydantic), и на уровне БД.
 
 ## API endpoints
 
-### Категории — `/categories`
-- `POST /categories` — создать категорию (`201 Created`)
-- `GET /categories` — список категорий (`200 OK`)
-- `GET /categories/{id}` — получить по id (`200`, `404` если не найдено)
-- `PATCH /categories/{id}` — обновить (`200`, `404` / `400` при конфликте)
-- `DELETE /categories/{id}` — удалить (`204 No Content`, `404` если не найдено)
+Базовый префикс: **`/api/v1`**. Интерактивная документация: `/docs` (Swagger UI), схема: `/openapi.json`.
 
-### Транзакции — `/transactions`
-- `POST /transactions` — создать (`201`, `404` если категория не существует)
-- `GET /transactions` — список с фильтрами `type`, `category_id`, `start_date`, `end_date` (`200`)
-- `GET /transactions/{id}` — по id (`200`, `404`)
-- `PATCH /transactions/{id}` — обновить (`200`, `404`)
-- `DELETE /transactions/{id}` — удалить (`204`, `404`)
+### Категории — `/api/v1/categories`
+- `POST /api/v1/categories` — создать (`201 Created`; `409` если пара name+type уже есть)
+- `GET /api/v1/categories` — список (`200`, пагинация `limit`/`offset`)
+- `GET /api/v1/categories/{id}` — по id (`200`; `404` если не найдено)
+- `PATCH /api/v1/categories/{id}` — частично обновить (`200`; `404` / `409`)
+- `DELETE /api/v1/categories/{id}` — удалить каскадно с транзакциями и бюджетами (`204`; `404`)
 
-### Бюджеты — `/budgets`
-- `POST /budgets` — создать (`201`, `404` если категория не существует, `400` если бюджет на эту категорию и месяц уже есть)
-- `GET /budgets` — список с фильтрами `month`, `category_id` (`200`)
-- `GET /budgets/{id}` — по id (`200`, `404`)
-- `PATCH /budgets/{id}` — обновить (`200`, `404` / `400` при конфликте)
-- `DELETE /budgets/{id}` — удалить (`204`, `404`)
+### Транзакции — `/api/v1/transactions`
+- `POST /api/v1/transactions` — создать (`201`; `404` если категория не существует)
+- `GET /api/v1/transactions` — список с фильтрами `type`, `category_id`, `start_date`, `end_date` + пагинация (`200`)
+- `GET /api/v1/transactions/{id}` — по id (`200`; `404`)
+- `PATCH /api/v1/transactions/{id}` — обновить (`200`; `404`)
+- `DELETE /api/v1/transactions/{id}` — удалить (`204`; `404`)
 
-Ошибки валидации некорректных данных возвращают `422 Unprocessable Entity` (Pydantic). Отсутствующие записи — `404 Not Found` с понятным `detail`. Конфликты уникальности — `400 Bad Request`.
+### Бюджеты — `/api/v1/budgets`
+- `POST /api/v1/budgets` — создать (`201`; `404` если категории нет; `409` если бюджет на эту категорию и месяц уже есть)
+- `GET /api/v1/budgets` — список с фильтрами `month`, `category_id` + пагинация (`200`)
+- `GET /api/v1/budgets/{id}` — по id (`200`; `404`)
+- `PATCH /api/v1/budgets/{id}` — обновить (`200`; `404` / `409`)
+- `DELETE /api/v1/budgets/{id}` — удалить (`204`; `404`)
 
-Документация интерактивная: `GET /docs` (Swagger UI) и `GET /openapi.json`.
+### Служебные
+- `GET /` — информация о сервисе
+- `GET /health/live` — liveness-проба (процесс жив)
+- `GET /health/ready` — readiness-проба (БД доступна; `503` если нет)
+
+### Коды ошибок
+- `404 Not Found` — запись не найдена, понятный `detail` («Категория с идентификатором 999 не найден»)
+- `409 Conflict` — конфликт уникальности (дубликат категории/бюджета)
+- `422 Unprocessable Entity` — некорректные данные (Pydantic: отрицательная сумма, неверный enum, месяц не `YYYY-MM` и т.п.)
+
+Доменные исключения обрабатываются **централизованно** (`app/core/exception_handlers.py`) — роутеры не содержат `try/except`.
 
 ## Порядок настройки и запуска
 
 ### Предварительные требования
-- [uv](https://github.com/astral-sh/uv) (менеджер пакетов Python)
+- [uv](https://github.com/astral-sh/uv) — менеджер пакетов Python
 - Python 3.12+
-- PostgreSQL (или Docker Compose)
+- PostgreSQL 16 (или Docker Compose)
 
-### 1. Клонирование и настройка окружения
+### 1. Настройка окружения
 
 ```bash
 cd server
@@ -105,60 +138,66 @@ cp .env.example .env
 # отредактируйте .env — задайте реальные DATABASE_URL и другие параметры
 ```
 
-Файл `.env` не коммитится (уже в `.gitignore`). Пример без секретов см. в `.env.example`.
+`.env` не коммитится (в `.gitignore`); пример без секретов — `.env.example`.
 
 ### 2. Установка зависимостей
 
 ```bash
-uv sync          # основные + dev зависимости
+uv sync
 ```
 
-### 3. Запуск приложения (локально, без Docker)
+### 3. Подготовка БД и создание таблиц
 
-Убедитесь, что PostgreSQL запущен и база `finance` создана, затем:
+Вариант A — **миграции Alembic** (рекомендуется):
+
+```bash
+uv run alembic upgrade head                    # применить все миграции
+uv run alembic revision --autogenerate -m "..."  # создать новую миграцию по моделям
+uv run alembic downgrade -1                    # откатить последнюю
+```
+
+Вариант B — автосоздание при старте (для dev/демо): `DB_AUTO_CREATE=True` (по умолчанию) — таблицы создаются в `lifespan` приложения.
+
+### 4. Запуск
 
 ```bash
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Приложение доступно на `http://localhost:8000` (Swagger UI: `/docs`).
+API: `http://localhost:8000` (Swagger UI: `/docs`). Альтернативно: `make backend-dev` из корня репозитория.
 
-### 4. Запуск через Docker Compose (PostgreSQL + приложение)
+### 5. Запуск через Docker Compose (PostgreSQL + приложение)
 
 ```bash
 docker compose up --build
 ```
 
-Это поднимет два сервиса:
-- `db` — PostgreSQL 16 (порт 5432, данные в именном volumen `finance_db_data`)
-- `app` — FastAPI backend (порт 8000)
+Поднимаются два сервиса:
+- `db` — PostgreSQL 16 (порт 5432, данные в named volume `finance_db_data`, healthcheck `pg_isready`)
+- `app` — FastAPI backend (порт 8000): при старте применяет `alembic upgrade head`, затем запускает uvicorn
 
-Остановить: `docker compose down`.
-
-### 5. Подготовка БД и создание таблиц
-
-Таблицы создаются автоматически при старте приложения (в `lifespan` через `Base.metadata.create_all`) — удобно для разработки и демо. В продакшене рекомендуется управлять схемой через Alembic-миграции вместо автосоздания.
-
-Для сброса данных (Docker): `docker compose down -v` удалит volumen с данными БД.
+Остановить: `docker compose down`; сбросить данные: `docker compose down -v`.
 
 ## Тесты
 
-Тесты используют in-memory SQLite (не требуют внешней PostgreSQL) и проверяют CRUD, связанные записи (категория → транзакции/бюджеты), обработку отсутствующих записей, дубликатов и валидации.
+Тесты используют in-memory SQLite и проверяют **ту же архитектуру**, что и production: сервисы работают через реальный Unit of Work, API — через подменённую зависимость `get_uow`. Покрыты: CRUD всех сущностей, бизнес-правила (дубликаты, проверка FK), фильтры, каскадное удаление связанных записей, коды ошибок 404/409/422.
 
 ```bash
-uv run pytest
+uv run pytest          # 26 тестов
+uv run ruff check app tests migrations   # линтер
 ```
-
-Результат: 28 тестов, все проходят.
 
 ## Переменные окружения (.env)
 
-| Переменная | Описание | Пример |
-|------------|----------|--------|
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
 | `APP_NAME` | Название API | `Личный финучёт API` |
 | `APP_VERSION` | Версия API | `0.1.0` |
-| `DEBUG` | Режим отладки (включает SQL-логи) | `true` |
-| `DATABASE_URL` | URL подключения к PostgreSQL (asyncpg) | `postgresql+asyncpg://postgres:postgres@localhost:5432/finance` |
-| `ALLOWED_ORIGINS` | Разрешённые來源 CORS через запятую | `http://localhost:3000,http://127.0.0.1:3000` |
+| `DEBUG` | Режим отладки (SQL-эхо) | `False` |
+| `LOG_LEVEL` | Уровень логирования | `INFO` |
+| `API_V1_PREFIX` | Префикс маршрутов API | `/api/v1` |
+| `DATABASE_URL` | URL PostgreSQL (asyncpg) | `postgresql+asyncpg://postgres:postgres@localhost:5432/finance` |
+| `DB_AUTO_CREATE` | Автосоздание таблиц при старте (dev) | `True` |
+| `ALLOWED_ORIGINS` | Разрешённые источники CORS через запятую | `http://localhost:3000,...` |
 
 Пример без секретов: `.env.example`.

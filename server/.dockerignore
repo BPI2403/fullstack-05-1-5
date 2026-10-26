@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Environment и IDE
+.env
+.idea/
+.vscode/
+.DS_Store
+
+# Тесты и артефакты сборки
+tests/
+*.egg-info/
+Dockerfile
+compose.yml
+.dockerignore

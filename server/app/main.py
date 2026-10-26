@@ -1,29 +1,36 @@
-"""Точка входа FastAPI-приложения.
+"""Точка входа: фабрика FastAPI-приложения (composition root)."""
 
-Создаёт приложение, настраивает CORS, подключает роутеры API
- и создаёт таблицы БД при старте (для разработки и демонстрации).
-"""
-
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.database import Base, engine
-from app.router import budgets, categories, transactions
+from app import models  # noqa: F401 — регистрация моделей в Base.metadata
+from app.api.health import router as health_router
+from app.api.v1.router import api_router
+from app.core.config import settings
+from app.core.exception_handlers import register_exception_handlers
+from app.core.logging import configure_logging
+from app.db.base import Base
+from app.db.session import engine
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Создаём таблицы при старте (для dev/демо; в production используйте Alembic).
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    if settings.db_auto_create:
+        # Быстрый старт для разработки и демо.
+        # В production схему разворачивает Alembic: `alembic upgrade head`.
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
     yield
     await engine.dispose()
 
 
 def create_app() -> FastAPI:
+    """Создаёт и настраивает приложение FastAPI."""
+    configure_logging()
+
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -39,21 +46,17 @@ def create_app() -> FastAPI:
         allow_headers=settings.allowed_headers,
     )
 
-    app.include_router(categories.router)
-    app.include_router(transactions.router)
-    app.include_router(budgets.router)
+    register_exception_handlers(app)
+    app.include_router(api_router, prefix=settings.api_v1_prefix)
+    app.include_router(health_router)
 
-    @app.get("/", summary="Проверка работы API")
-    async def root():
+    @app.get("/", tags=["Service"], summary="Информация о сервисе")
+    async def root() -> dict[str, str]:
         return {
             "name": settings.app_name,
             "version": settings.app_version,
             "status": "ok",
         }
-
-    @app.get("/health", summary="Проверка здоровья сервиса")
-    async def health():
-        return {"status": "healthy"}
 
     return app
 

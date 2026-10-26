@@ -1,36 +1,42 @@
 """Схемы транзакций (запросы и ответы API)."""
 
-from datetime import date
-from typing import Annotated, Optional
+import datetime
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import Field
 
-
-class TransactionBase(BaseModel):
-    type: str = Field(..., min_length=1, max_length=20, examples=["income", "expense"])
-    amount: float = Field(..., gt=0, examples=[120000, 4500])
-    category_id: int = Field(..., examples=[1])
-    date: Annotated[date, Field(..., examples=["2025-09-02"])]
-    description: Optional[str] = Field(default=None, max_length=255, examples=["Продукты"])
+from app.models.enums import FinanceType
+from app.schemas.base import BaseSchema
 
 
-class TransactionCreate(TransactionBase):
-    """Создание транзакции."""
+# Аннотация ``datetime.date`` вместо ``date``: имя поля ``date`` не должно
+# совпадать с именем типа (конфликт резолвинга аннотаций Pydantic).
+class TransactionCreate(BaseSchema):
+    """Данные для создания транзакции."""
+
+    type: FinanceType = Field(examples=[FinanceType.EXPENSE])
+    amount: float = Field(gt=0, examples=[4500])
+    category_id: int = Field(gt=0, examples=[1])
+    date: datetime.date = Field(examples=["2025-09-02"])
+    description: str | None = Field(default=None, max_length=255, examples=["Продукты"])
 
 
-class TransactionUpdate(BaseModel):
-    """Обновление транзакции (все поля опциональны)."""
+class TransactionUpdate(BaseSchema):
+    """Данные для частичного обновления транзакции (все поля опциональны)."""
 
-    type: Optional[str] = Field(default=None, min_length=1, max_length=20)
-    amount: Optional[float] = Field(default=None, gt=0)
-    category_id: Optional[int] = Field(default=None)
-    date: Annotated[Optional[date], Field(default=None)]
-    description: Optional[str] = Field(default=None, max_length=255)
+    type: FinanceType | None = None
+    amount: float | None = Field(default=None, gt=0)
+    category_id: int | None = Field(default=None, gt=0)
+    date: datetime.date | None = Field(default=None)
+    description: str | None = Field(default=None, max_length=255)
 
 
-class TransactionResponse(TransactionBase):
-    """Ответ с данными транзакции."""
+class TransactionResponse(BaseSchema):
+    """Транзакция в ответе API."""
 
     id: int
+    type: FinanceType
+    amount: float
+    category_id: int
+    date: datetime.date
+    description: str | None
 
-    model_config = ConfigDict(from_attributes=True)

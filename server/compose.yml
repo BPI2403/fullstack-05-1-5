@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # PostgreSQL — основная база данных приложения
   db:
@@ -14,12 +12,12 @@ services:
     volumes:
       - finance_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d finance"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # FastAPI backend
+  # FastAPI backend (схему применяет Alembic при старте контейнера)
   app:
     build:
       context: .
@@ -32,12 +30,17 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/finance
       APP_NAME: "Личный финучёт API"
       APP_VERSION: "0.1.0"
-      DEBUG: "true"
+      DEBUG: "false"
+      LOG_LEVEL: "INFO"
+      DB_AUTO_CREATE: "false"  # схему управляет Alembic
       ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
     ports:
       - "8000:8000"
-    volumes:
-      - ./app:/app/app
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:

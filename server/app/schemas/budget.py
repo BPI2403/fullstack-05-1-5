@@ -1,31 +1,33 @@
 """Схемы бюджетов (запросы и ответы API)."""
 
-from typing import Optional
+from pydantic import Field
 
-from pydantic import BaseModel, Field, ConfigDict
+from app.schemas.base import BaseSchema
 
-
-class BudgetBase(BaseModel):
-    category_id: int = Field(..., examples=[1])
-    limit: float = Field(..., gt=0, examples=[20000])
-    month: str = Field(..., min_length=7, max_length=7, pattern=r"^\d{4}-\d{2}$", examples=["2025-09"])
+# Месяц строго в формате YYYY-MM с реальным номером месяца 01-12.
+MONTH_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
 
 
-class BudgetCreate(BudgetBase):
-    """Создание бюджета."""
+class BudgetCreate(BaseSchema):
+    """Данные для создания бюджета."""
+
+    category_id: int = Field(gt=0, examples=[1])
+    limit: float = Field(gt=0, examples=[20000])
+    month: str = Field(pattern=MONTH_PATTERN, examples=["2025-09"])
 
 
-class BudgetUpdate(BaseModel):
-    """Обновление бюджета (все поля опциональны)."""
+class BudgetUpdate(BaseSchema):
+    """Данные для частичного обновления бюджета (все поля опциональны)."""
 
-    category_id: Optional[int] = Field(default=None)
-    limit: Optional[float] = Field(default=None, gt=0)
-    month: Optional[str] = Field(default=None, min_length=7, max_length=7, pattern=r"^\d{4}-\d{2}$")
+    category_id: int | None = Field(default=None, gt=0)
+    limit: float | None = Field(default=None, gt=0)
+    month: str | None = Field(default=None, pattern=MONTH_PATTERN)
 
 
-class BudgetResponse(BudgetBase):
-    """Ответ с данными бюджета."""
+class BudgetResponse(BaseSchema):
+    """Бюджет в ответе API."""
 
     id: int
-
-    model_config = ConfigDict(from_attributes=True)
+    category_id: int
+    limit: float
+    month: str

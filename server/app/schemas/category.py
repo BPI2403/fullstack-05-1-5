@@ -1,33 +1,34 @@
 """Схемы категорий (запросы и ответы API)."""
 
-from typing import Optional
+from pydantic import Field
 
-from pydantic import BaseModel, Field, ConfigDict
-
-
-class CategoryBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100, examples=["Зарплата", "Еда"])
-    type: str = Field(..., min_length=1, max_length=20, examples=["income", "expense"])
-    icon: Optional[str] = Field(default=None, max_length=50, examples=["💼", "🍽️"])
-    color: Optional[str] = Field(default=None, max_length=20, examples=["#2563eb", "#ef4444"])
+from app.models.enums import FinanceType
+from app.schemas.base import BaseSchema
 
 
-class CategoryCreate(CategoryBase):
-    """Создание категории."""
+class CategoryCreate(BaseSchema):
+    """Данные для создания категории."""
+
+    name: str = Field(min_length=1, max_length=100, examples=["Зарплата"])
+    type: FinanceType = Field(examples=[FinanceType.INCOME])
+    icon: str | None = Field(default=None, max_length=50, examples=["💼"])
+    color: str | None = Field(default=None, max_length=20, examples=["#2563eb"])
 
 
-class CategoryUpdate(BaseModel):
-    """Обновление категории (все поля опциональны)."""
+class CategoryUpdate(BaseSchema):
+    """Данные для частичного обновления категории (все поля опциональны)."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    type: Optional[str] = Field(default=None, min_length=1, max_length=20)
-    icon: Optional[str] = Field(default=None, max_length=50)
-    color: Optional[str] = Field(default=None, max_length=20)
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    type: FinanceType | None = None
+    icon: str | None = Field(default=None, max_length=50)
+    color: str | None = Field(default=None, max_length=20)
 
 
-class CategoryResponse(CategoryBase):
-    """Ответ с данными категории."""
+class CategoryResponse(BaseSchema):
+    """Категория в ответе API."""
 
     id: int
-
-    model_config = ConfigDict(from_attributes=True)
+    name: str
+    type: FinanceType
+    icon: str | None
+    color: str | None

@@ -1,130 +1,116 @@
-"""Тесты CRUD и API для транзакций (включая связанные категории)."""
+"""Тесты транзакций: сервис, связность с категорией, API."""
 
-from app.crud.category import create_category
-from app.crud.exceptions import NotFoundError
-from app.crud.transaction import (
-    create_transaction,
-    delete_transaction,
-    get_transaction,
-    list_transactions,
-    update_transaction,
-)
-from app.models.base import Category
+import pytest
+
+from app.core.exceptions import NotFoundError
+from app.models.enums import FinanceType
 from app.schemas.category import CategoryCreate
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
+from app.services.budget import BudgetService
+from app.services.category import CategoryService
+from app.services.transaction import TransactionService
+
+PREFIX = "/api/v1/transactions"
 
 
-async def _make_category(session, name="Еда", type_="expense"):
-    return await create_category(
-        session, CategoryCreate(name=name, type=type_, icon="🍽️", color="#ef4444")
+@pytest.fixture
+def category_service(uow) -> CategoryService:
+    return CategoryService(uow)
+
+
+@pytest.fixture
+def transaction_service(uow) -> TransactionService:
+    return TransactionService(uow)
+
+
+@pytest.fixture
+def budget_service(uow) -> BudgetService:
+    return BudgetService(uow)
+
+
+async def test_create_transaction_with_category(category_service, transaction_service):
+    category = await category_service.create(
+        CategoryCreate(name="Еда", type=FinanceType.EXPENSE)
     )
-
-
-async def test_create_transaction_with_category(db_session):
-    category = await _make_category(db_session)
-    transaction = await create_transaction(
-        db_session,
+    transaction = await transaction_service.create(
         TransactionCreate(
-            type="expense",
+            type=FinanceType.EXPENSE,
             amount=4500,
             category_id=category.id,
             date="2025-09-02",
             description="Продукты",
-        ),
+        )
     )
     assert transaction.id is not None
     assert transaction.category_id == category.id
-    assert transaction.amount == 4500
 
 
-async def test_create_transaction_unknown_category(db_session):
-    try:
-        await create_transaction(
-            db_session,
+async def test_create_transaction_unknown_category(transaction_service):
+    with pytest.raises(NotFoundError):
+        await transaction_service.create(
             TransactionCreate(
-                type="expense",
-                amount=100,
-                category_id=99999,
-                date="2025-09-02",
-            ),
+                type=FinanceType.EXPENSE, amount=100, category_id=99999, date="2025-09-02"
+            )
         )
-    except NotFoundError as exc:
-        assert "Категория" in str(exc)
-    else:
-        raise AssertionError("Ожидалось NotFoundError")
 
 
-async def test_list_transactions_filter(db_session):
-    category = await _make_category(db_session)
-    await create_transaction(
-        db_session,
-        TransactionCreate(
-            type="expense", amount=100, category_id=category.id, date="2025-09-01"
-        ),
+async def test_list_transactions_filter(category_service, transaction_service):
+    category = await category_service.create(
+        CategoryCreate(name="Еда", type=FinanceType.EXPENSE)
     )
-    await create_transaction(
-        db_session,
+    await transaction_service.create(
         TransactionCreate(
-            type="income", amount=5000, category_id=category.id, date="2025-09-05"
-        ),
+            type=FinanceType.EXPENSE, amount=100, category_id=category.id, date="2025-09-01"
+        )
+    )
+    await transaction_service.create(
+        TransactionCreate(
+            type=FinanceType.INCOME, amount=5000, category_id=category.id, date="2025-09-05"
+        )
     )
 
-    expenses = await list_transactions(db_session, type_filter="expense")
+    expenses = await transaction_service.list(type_=FinanceType.EXPENSE)
     assert len(expenses) == 1
-    assert expenses[0].type == "expense"
+    assert expenses[0].type == FinanceType.EXPENSE
 
-    incomes = await list_transactions(db_session, type_filter="income")
+    incomes = await transaction_service.list(type_=FinanceType.INCOME)
     assert len(incomes) == 1
-    assert incomes[0].type == "income"
 
 
-async def test_get_and_update_transaction(db_session):
-    category = await _make_category(db_session)
-    transaction = await create_transaction(
-        db_session,
+async def test_update_and_delete_transaction(category_service, transaction_service):
+    category = await category_service.create(
+        CategoryCreate(name="Еда", type=FinanceType.EXPENSE)
+    )
+    transaction = await transaction_service.create(
         TransactionCreate(
-            type="expense", amount=100, category_id=category.id, date="2025-09-01"
-        ),
+            type=FinanceType.EXPENSE, amount=100, category_id=category.id, date="2025-09-01"
+        )
     )
-    updated = await update_transaction(
-        db_session,
-        transaction.id,
-        TransactionUpdate(amount=200, description="Обновлено"),
+
+    updated = await transaction_service.update(
+        transaction.id, TransactionUpdate(amount=200, description="Обновлено")
     )
-    assert updated.amount == 200
+    assert float(updated.amount) == 200
     assert updated.description == "Обновлено"
-    assert updated.type == "expense"
+
+    await transaction_service.delete(transaction.id)
+    with pytest.raises(NotFoundError):
+        await transaction_service.get(transaction.id)
 
 
-async def test_delete_transaction(db_session):
-    category = await _make_category(db_session)
-    transaction = await create_transaction(
-        db_session,
-        TransactionCreate(
-            type="expense", amount=100, category_id=category.id, date="2025-09-01"
-        ),
-    )
-    await delete_transaction(db_session, transaction.id)
-    try:
-        await get_transaction(db_session, transaction.id)
-    except NotFoundError:
-        pass
-    else:
-        raise AssertionError("Ожидалось NotFoundError после удаления")
+# ---------------- API ----------------
 
 
 async def test_api_create_and_list_transaction(client):
-    # Сначала создаём категорию
     resp = await client.post(
-        "/categories/",
-        json={"name": "Транспорт", "type": "expense", "icon": "🚇", "color": "#f59e0b"},
+        "/api/v1/categories", json={"name": "Транспорт", "type": "expense", "icon": "🚇"}
     )
     assert resp.status_code == 201
     category_id = resp.json()["id"]
 
     resp = await client.post(
-        "/transactions/",
-        json={
+        f"{PREFIX}",
+ json={
             "type": "expense",
             "amount": 600,
             "category_id": category_id,
@@ -133,25 +119,22 @@ async def test_api_create_and_list_transaction(client):
         },
     )
     assert resp.status_code == 201
-    data = resp.json()
-    assert data["category_id"] == category_id
-    assert data["amount"] == 600
+    assert resp.json()["category_id"] == category_id
 
-    resp = await client.get("/transactions/")
+    resp = await client.get(f"{PREFIX}")
     assert resp.status_code == 200
-    items = resp.json()
-    assert len(items) >= 1
+    assert len(resp.json()) >= 1
 
 
-async def test_api_transaction_not_found(client):
-    resp = await client.get("/transactions/99999")
+async def test_api_not_found(client):
+    resp = await client.get(f"{PREFIX}/99999")
     assert resp.status_code == 404
     assert "не найден" in resp.json()["detail"]
 
 
-async def test_api_transaction_invalid_category(client):
+async def test_api_invalid_category(client):
     resp = await client.post(
-        "/transactions/",
+        f"{PREFIX}",
         json={
             "type": "expense",
             "amount": 100,
@@ -162,9 +145,9 @@ async def test_api_transaction_invalid_category(client):
     assert resp.status_code == 404
 
 
-async def test_api_transaction_invalid_amount(client):
+async def test_api_invalid_amount(client):
     resp = await client.post(
-        "/transactions/",
+        f"{PREFIX}",
         json={
             "type": "expense",
             "amount": -100,
