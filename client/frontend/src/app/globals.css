@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(224 71% 4%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(224 71% 4%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(224 71% 4%);
+  --color-primary: hsl(265 89% 65%);
+  --color-primary-foreground: hsl(224 71% 94%);
+  --color-muted: hsl(224 71% 96%);
+  --color-muted-foreground: hsl(224 71% 26%);
+  --color-accent: hsl(265 89% 65%);
+  --color-accent-foreground: hsl(224 71% 4%);
+  --color-destructive: hsl(0 84% 61%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(224 71% 90%);
+  --color-input: hsl(224 71% 90%);
+  --color-ring: hsl(265 89% 65%);
+  --color-secondary: hsl(224 71% 96%);
+  --color-secondary-foreground: hsl(224 71% 9%);
+  --color-selection: hsl(224 71% 90%);
+
+  --radius: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: hsl(224 71% 4%);
+    --color-foreground: hsl(0 0% 93%);
+    --color-card: hsl(224 71% 8%);
+    --color-card-foreground: hsl(0 0% 93%);
+    --color-popover: hsl(224 71% 8%);
+    --color-popover-foreground: hsl(0 0% 93%);
+    --color-muted: hsl(224 71% 15%);
+    --color-muted-foreground: hsl(224 71% 65%);
+    --color-border: hsl(224 71% 20%);
+    --color-input: hsl(224 71% 20%);
+    --color-secondary: hsl(224 71% 18%);
+    --color-secondary-foreground: hsl(0 0% 93%);
+  }
+}
+
+:root {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+/* ---------- Анимации интерфейса ---------- */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shake {
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes dialog-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+}
+
+@keyframes grow-bar {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Появление контента страницы при переключении маршрута */
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out both;
+}
+
+/* Встряска формы при неудачной валидации */
+.animate-shake {
+  animation: shake 0.3s ease-in-out;
+}
+
+/* Появление столбцов диаграммы снизу вверх */
+.bar-grow {
+  transform-origin: bottom;
+  animation: grow-bar 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Диалоги: без tailwindcss-animate анимации описаны вручную */
+.dialog-overlay[data-state="open"] {
+  animation: fade-in 0.2s ease-out;
+}
+.dialog-overlay[data-state="closed"] {
+  animation: fade-out 0.15s ease-in;
+}
+.dialog-content[data-state="open"] {
+  animation: dialog-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dialog-content[data-state="closed"] {
+  animation: dialog-out 0.15s ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
