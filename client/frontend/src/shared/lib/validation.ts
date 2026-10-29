@@ -52,6 +52,13 @@ export const maxNumber =
     return num <= limit ? null : message ?? `Не больше ${limit}`;
   };
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+export const email =
+  (message = "Введите корректный email"): Validator<string> =>
+  (value) =>
+    EMAIL_PATTERN.test(value.trim()) ? null : message;
+
 export const notFutureDate =
   (message = "Дата не может быть в будущем"): Validator<string> =>
   (value) => {

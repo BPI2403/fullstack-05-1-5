@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.repositories.budget import BudgetRepository
 from app.repositories.category import CategoryRepository
+from app.repositories.refresh_session import RefreshSessionRepository
 from app.repositories.transaction import TransactionRepository
+from app.repositories.user import UserRepository
 
 
 class UnitOfWork:
@@ -19,6 +21,8 @@ class UnitOfWork:
     categories: CategoryRepository
     transactions: TransactionRepository
     budgets: BudgetRepository
+    users: UserRepository
+    refresh_sessions: RefreshSessionRepository
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._session_factory = session_factory
@@ -28,6 +32,8 @@ class UnitOfWork:
         self.categories = CategoryRepository(self.session)
         self.transactions = TransactionRepository(self.session)
         self.budgets = BudgetRepository(self.session)
+        self.users = UserRepository(self.session)
+        self.refresh_sessions = RefreshSessionRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

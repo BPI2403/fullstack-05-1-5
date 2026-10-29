@@ -1,8 +1,8 @@
-"""Маршруты API категорий."""
+"""Маршруты API категорий (защищены: работают в рамках текущего пользователя)."""
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import CategoryServiceDep
+from app.api.deps import CategoryServiceDep, CurrentUserDep
 from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
@@ -15,19 +15,20 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
     summary="Создать категорию",
 )
 async def create_category(
-    payload: CategoryCreate, service: CategoryServiceDep
+    payload: CategoryCreate, user: CurrentUserDep, service: CategoryServiceDep
 ) -> CategoryResponse:
-    category = await service.create(payload)
+    category = await service.create(payload, user_id=user.id)
     return CategoryResponse.model_validate(category)
 
 
 @router.get("", response_model=list[CategoryResponse], summary="Список категорий")
 async def list_categories(
+    user: CurrentUserDep,
     service: CategoryServiceDep,
     limit: int = Query(default=100, ge=1, le=500, description="Размер страницы"),
     offset: int = Query(default=0, ge=0, description="Смещение выборки"),
 ) -> list[CategoryResponse]:
-    categories = await service.list(limit=limit, offset=offset)
+    categories = await service.list(user.id, limit=limit, offset=offset)
     return [CategoryResponse.model_validate(c) for c in categories]
 
 
@@ -36,8 +37,10 @@ async def list_categories(
     response_model=CategoryResponse,
     summary="Получить категорию по id",
 )
-async def get_category(category_id: int, service: CategoryServiceDep) -> CategoryResponse:
-    category = await service.get(category_id)
+async def get_category(
+    category_id: int, user: CurrentUserDep, service: CategoryServiceDep
+) -> CategoryResponse:
+    category = await service.get(category_id, user_id=user.id)
     return CategoryResponse.model_validate(category)
 
 
@@ -47,9 +50,12 @@ async def get_category(category_id: int, service: CategoryServiceDep) -> Categor
     summary="Обновить категорию",
 )
 async def update_category(
-    category_id: int, payload: CategoryUpdate, service: CategoryServiceDep
+    category_id: int,
+    payload: CategoryUpdate,
+    user: CurrentUserDep,
+    service: CategoryServiceDep,
 ) -> CategoryResponse:
-    category = await service.update(category_id, payload)
+    category = await service.update(category_id, payload, user_id=user.id)
     return CategoryResponse.model_validate(category)
 
 
@@ -58,5 +64,7 @@ async def update_category(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Удалить категорию (каскадно с транзакциями и бюджетами)",
 )
-async def delete_category(category_id: int, service: CategoryServiceDep) -> None:
-    await service.delete(category_id)
+async def delete_category(
+    category_id: int, user: CurrentUserDep, service: CategoryServiceDep
+) -> None:
+    await service.delete(category_id, user_id=user.id)

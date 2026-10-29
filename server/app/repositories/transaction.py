@@ -1,4 +1,4 @@
-"""Репозиторий транзакций."""
+"""Репозиторий транзакций (запросы всегда ограничены пользователем)."""
 
 from collections.abc import Sequence
 from datetime import date
@@ -11,13 +11,23 @@ from app.repositories.base import BaseRepository
 
 
 class TransactionRepository(BaseRepository[Transaction]):
-    """Доступ к таблице ``transactions``."""
+    """Доступ к таблице ``transactions`` в пределах одного пользователя."""
 
     model = Transaction
+
+    async def get_for_user(self, transaction_id: int, user_id: int) -> Transaction | None:
+        """Транзакция пользователя по id; чужие транзакции не видны."""
+        stmt = select(Transaction).where(
+            Transaction.id == transaction_id,
+            Transaction.user_id == user_id,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def list_filtered(
         self,
         *,
+        user_id: int,
         type_: FinanceType | None = None,
         category_id: int | None = None,
         start_date: date | None = None,
@@ -25,8 +35,8 @@ class TransactionRepository(BaseRepository[Transaction]):
         limit: int = 100,
         offset: int = 0,
     ) -> Sequence[Transaction]:
-        """Транзакции с опциональными фильтрами, новые — первыми."""
-        stmt = select(Transaction)
+        """Транзакции пользователя с опциональными фильтрами, новые — первыми."""
+        stmt = select(Transaction).where(Transaction.user_id == user_id)
         if type_ is not None:
             stmt = stmt.where(Transaction.type == type_)
         if category_id is not None:

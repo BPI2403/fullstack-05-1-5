@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Navigation } from "./ui/navigation";
 import { AppProviders } from "./providers";
 import "./globals.css";
 
@@ -26,12 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-screen bg-background text-foreground">
-        <AppProviders>
-          <div className="flex h-screen overflow-y-auto">
-            <Navigation />
-            <main className="flex-1 overflow-y-auto">{children}</main>
-          </div>
-        </AppProviders>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

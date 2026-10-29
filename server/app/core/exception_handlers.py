@@ -9,7 +9,9 @@ from app.core.exceptions import (
     ConflictError,
     DomainError,
     DomainValidationError,
+    ForbiddenError,
     NotFoundError,
+    UnauthorizedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,21 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(UnauthorizedError)
+    async def handle_unauthorized(request: Request, exc: UnauthorizedError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": str(exc)},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    @app.exception_handler(ForbiddenError)
+    async def handle_forbidden(request: Request, exc: ForbiddenError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
             content={"detail": str(exc)},
         )
 

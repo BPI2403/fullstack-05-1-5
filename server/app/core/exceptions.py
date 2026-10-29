@@ -24,3 +24,11 @@ class ConflictError(DomainError):
 
 class DomainValidationError(DomainError):
     """Нарушение бизнес-правил (HTTP 400)."""
+
+
+class UnauthorizedError(DomainError):
+    """Отсутствие или недействительность учётных данных (HTTP 401)."""
+
+
+class ForbiddenError(DomainError):
+    """Недостаточно прав для операции (HTTP 403)."""

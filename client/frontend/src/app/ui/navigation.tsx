@@ -1,13 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { NAV_ITEMS } from "@/shared/config/navigation";
 import { cn } from "@/shared/lib/utils";
+import { useAuth } from "@/entities/user/model/auth-store";
+import { Button } from "@/shared/ui/button";
 
-/** Боковая навигация приложения. */
+/** Боковая навигация приложения с данными пользователя и выходом. */
 export function Navigation() {
   const pathname = usePathname();
+  const { user, actions } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await actions.logout();
+    router.replace("/login");
+  };
 
   return (
     <nav className="w-64 flex-shrink-0 bg-card border-r border-border flex flex-col">
@@ -39,6 +49,33 @@ export function Navigation() {
           );
         })}
       </ul>
+      {user ? (
+        <div className="border-t border-border p-4">
+          <p
+            className="mb-2 truncate text-sm font-medium text-foreground"
+            title={user.email}
+          >
+            {user.display_name ?? user.email}
+          </p>
+          {user.display_name ? (
+            <p
+              className="mb-2 truncate text-xs text-muted-foreground"
+              title={user.email}
+            >
+              {user.email}
+            </p>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={handleLogout}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Выйти
+          </Button>
+        </div>
+      ) : null}
     </nav>
   );
 }

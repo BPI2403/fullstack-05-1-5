@@ -47,6 +47,29 @@ async def uow() -> AsyncGenerator[UnitOfWork, None]:
 
 
 @pytest.fixture
+async def user_id(uow: UnitOfWork) -> int:
+    """Создаёт пользователя через AuthService и возвращает его id."""
+    from app.schemas.auth import RegisterRequest
+    from app.services.auth import AuthService
+
+    user, _ = await AuthService(uow).register(
+        RegisterRequest(email="test@example.com", password="password123")
+    )
+    return user.id
+
+
+@pytest.fixture
+async def auth_headers(client: AsyncClient) -> dict[str, str]:
+    """Регистрирует пользователя через API и возвращает заголовки доступа."""
+    resp = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "api@example.com", "password": "password123"},
+    )
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
 async def client(uow: UnitOfWork) -> AsyncGenerator[AsyncClient, None]:
     """HTTP-клиент поверх приложения с подменённым Unit of Work."""
     from app.api.deps import get_uow

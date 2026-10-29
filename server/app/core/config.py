@@ -6,8 +6,10 @@
 
 from functools import lru_cache
 
+from typing import Annotated
+
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -36,8 +38,21 @@ class Settings(BaseSettings):
         description="Создавать таблицы при старте (dev/демо); в production — Alembic",
     )
 
+    # Аутентификация (JWT)
+    # Значение по умолчанию — только для локальной разработки и тестов;
+    # в реальном окружении задайте JWT_SECRET_KEY в .env.
+    jwt_secret_key: str = Field(
+        default="dev-secret-change-me",
+        description="Секрет для подписи JWT access token",
+    )
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+
     # CORS
-    allowed_origins: list[str] = [
+    # NoDecode: pydantic-settings не пытается разобрать строку как JSON;
+    # разделённый запятыми список разбирает валидатор ниже.
+    allowed_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]

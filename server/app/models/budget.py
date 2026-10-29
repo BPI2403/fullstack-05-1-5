@@ -14,8 +14,13 @@ class Budget(IntPrimaryKeyMixin, TimestampMixin, Base):
     """Месячный лимит трат по категории (месяц — строка ``YYYY-MM``)."""
 
     __tablename__ = "budgets"
-    __table_args__ = (UniqueConstraint("category_id", "month"),)
+    __table_args__ = (UniqueConstraint("user_id", "category_id", "month"),)
 
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id", ondelete="CASCADE"),
         nullable=False,
