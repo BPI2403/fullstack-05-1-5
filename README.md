@@ -211,13 +211,15 @@ client/frontend/src/
 
 # Запуск
 
-1. Создайте базу данных PostgreSQL и примените миграции:
-   `cd server && uv run alembic upgrade head`.
-2. Установите зависимости сервера: `cd server && uv sync`.
+1. Установите зависимости сервера: `cd server && uv sync`.
+2. Создайте базу данных PostgreSQL и примените миграции:
+   `uv run alembic upgrade head`.
 3. Задайте настройки в `server/.env` (см. `.env.example`). Обязательно задайте свой `JWT_SECRET_KEY`.
 4. Запустите сервер: `make backend-dev`. Адрес: `http://localhost:8000`. Документация API: `http://localhost:8000/docs`.
 5. Установите зависимости клиента: `cd client/frontend && npm install`.
 6. Запустите клиент: `make dev`. Откройте адрес `http://localhost:3000`.
+
+Примечание: клиент ожидает сервер по адресу `http://localhost:8000`. Другой адрес задайте переменной `NEXT_PUBLIC_API_URL` при сборке клиента.
 
 # Ограничения
 
