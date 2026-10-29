@@ -8,4 +8,5 @@ export interface Budget {
 export interface BudgetInput {
   categoryId: string;
   limit: number;
+  month: string;
 }

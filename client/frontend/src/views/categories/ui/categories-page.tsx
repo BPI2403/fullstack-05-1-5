@@ -45,9 +45,11 @@ export function CategoriesPage() {
     setFormOpen(true);
   };
 
-  const handleDelete = (category: Category) => {
+  const handleDelete = async (category: Category) => {
     if (confirm(`Удалить категорию «${category.name}»?`)) {
-      actions.deleteCategory(category.id);
+      // Каскад удаляет связанные транзакции и бюджеты: перезагружаем всё.
+      await actions.deleteCategory(category.id);
+      actions.reload();
     }
   };
 

@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Стор финансов: данные пользователя с сервера + CRUD-действия.
+ *
+ * Загрузка стартует при входе пользователя и повторяется по кнопке
+ * «Повторить». Мутации ходят в API и обновляют состояние ответами
+ * сервера, поэтому интерфейс всегда показывает актуальные данные.
+ */
+
 import {
   createContext,
   useCallback,
@@ -9,16 +17,29 @@ import {
   useReducer,
   type ReactNode,
 } from "react";
+import { useAuth } from "@/entities/user/model/auth-store";
 import type { Category, CategoryInput } from "@/entities/category/model/types";
 import type {
   Transaction,
   TransactionInput,
 } from "@/entities/transaction/model/types";
 import type { Budget, BudgetInput } from "@/entities/budget/model/types";
-import { createId } from "@/shared/lib/utils";
-import { fetchFinanceSnapshot, type FinanceSnapshot } from "./mock-api";
+import {
+  createBudgetApi,
+  createCategoryApi,
+  createTransactionApi,
+  deleteBudgetApi,
+  deleteCategoryApi,
+  deleteTransactionApi,
+  fetchBudgets,
+  fetchCategories,
+  fetchTransactions,
+  updateBudgetApi,
+  updateCategoryApi,
+  updateTransactionApi,
+} from "./api";
 
-export type FinanceStatus = "loading" | "ready" | "error";
+export type FinanceStatus = "idle" | "loading" | "ready" | "error";
 
 export interface FinanceState {
   status: FinanceStatus;
@@ -31,26 +52,34 @@ export interface FinanceState {
 
 type FinanceAction =
   | { type: "loadStart" }
-  | { type: "loadSuccess"; snapshot: FinanceSnapshot }
+  | { type: "loadSuccess"; currentMonth: string; categories: Category[]; transactions: Transaction[]; budgets: Budget[] }
   | { type: "loadError"; message: string }
+  | { type: "reset" }
   | { type: "transactionAdd"; transaction: Transaction }
-  | { type: "transactionUpdate"; id: string; patch: TransactionInput }
+  | { type: "transactionUpdate"; id: string; transaction: Transaction }
   | { type: "transactionDelete"; id: string }
   | { type: "categoryAdd"; category: Category }
-  | { type: "categoryUpdate"; id: string; patch: CategoryInput }
+  | { type: "categoryUpdate"; id: string; category: Category }
   | { type: "categoryDelete"; id: string }
   | { type: "budgetAdd"; budget: Budget }
-  | { type: "budgetUpdate"; id: string; patch: BudgetInput }
+  | { type: "budgetUpdate"; id: string; budget: Budget }
   | { type: "budgetDelete"; id: string };
 
 const initialState: FinanceState = {
-  status: "loading",
+  status: "idle",
   error: null,
   currentMonth: "",
   categories: [],
   transactions: [],
   budgets: [],
 };
+
+/** Текущий месяц в формате YYYY-MM (локальная дата). */
+function currentMonth(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${now.getFullYear()}-${month}`;
+}
 
 function reducer(state: FinanceState, action: FinanceAction): FinanceState {
   switch (action.type) {
@@ -60,20 +89,22 @@ function reducer(state: FinanceState, action: FinanceAction): FinanceState {
       return {
         status: "ready",
         error: null,
-        currentMonth: action.snapshot.currentMonth,
-        categories: action.snapshot.categories,
-        transactions: action.snapshot.transactions,
-        budgets: action.snapshot.budgets,
+        currentMonth: action.currentMonth,
+        categories: action.categories,
+        transactions: action.transactions,
+        budgets: action.budgets,
       };
     case "loadError":
       return { ...state, status: "error", error: action.message };
+    case "reset":
+      return initialState;
     case "transactionAdd":
       return { ...state, transactions: [action.transaction, ...state.transactions] };
     case "transactionUpdate":
       return {
         ...state,
         transactions: state.transactions.map((t) =>
-          t.id === action.id ? { ...t, ...action.patch } : t,
+          t.id === action.id ? action.transaction : t,
         ),
       };
     case "transactionDelete":
@@ -87,9 +118,7 @@ function reducer(state: FinanceState, action: FinanceAction): FinanceState {
       return {
         ...state,
         categories: state.categories.map((c) =>
-          c.id === action.id
-            ? { ...c, ...action.patch, color: colorForType(action.patch.type) }
-            : c,
+          c.id === action.id ? action.category : c,
         ),
       };
     case "categoryDelete":
@@ -102,9 +131,7 @@ function reducer(state: FinanceState, action: FinanceAction): FinanceState {
     case "budgetUpdate":
       return {
         ...state,
-        budgets: state.budgets.map((b) =>
-          b.id === action.id ? { ...b, ...action.patch } : b,
-        ),
+        budgets: state.budgets.map((b) => (b.id === action.id ? action.budget : b)),
       };
     case "budgetDelete":
       return {
@@ -114,21 +141,17 @@ function reducer(state: FinanceState, action: FinanceAction): FinanceState {
   }
 }
 
-function colorForType(type: Category["type"]) {
-  return type === "income" ? "#10b981" : "#ef4444";
-}
-
 export interface FinanceActions {
   reload: () => void;
-  addTransaction: (input: TransactionInput) => void;
-  updateTransaction: (id: string, patch: TransactionInput) => void;
-  deleteTransaction: (id: string) => void;
-  addCategory: (input: CategoryInput) => void;
-  updateCategory: (id: string, patch: CategoryInput) => void;
-  deleteCategory: (id: string) => void;
-  addBudget: (input: BudgetInput) => void;
-  updateBudget: (id: string, patch: BudgetInput) => void;
-  deleteBudget: (id: string) => void;
+  addTransaction: (input: TransactionInput) => Promise<void>;
+  updateTransaction: (id: string, input: TransactionInput) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  addCategory: (input: CategoryInput) => Promise<void>;
+  updateCategory: (id: string, input: CategoryInput) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  addBudget: (input: BudgetInput) => Promise<void>;
+  updateBudget: (id: string, input: BudgetInput) => Promise<void>;
+  deleteBudget: (id: string) => Promise<void>;
 }
 
 interface FinanceContextValue {
@@ -139,63 +162,86 @@ interface FinanceContextValue {
 const FinanceContext = createContext<FinanceContextValue | null>(null);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
+  const { status: authStatus } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     dispatch({ type: "loadStart" });
-    fetchFinanceSnapshot()
-      .then((snapshot) => dispatch({ type: "loadSuccess", snapshot }))
-      .catch((error: unknown) =>
-        dispatch({
-          type: "loadError",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Неизвестная ошибка загрузки",
-        }),
-      );
+    const month = currentMonth();
+    try {
+      // Загружаем всё параллельно; бюджеты ограничены текущим месяцем.
+      const [categories, transactions, budgets] = await Promise.all([
+        fetchCategories(),
+        fetchTransactions(),
+        fetchBudgets(month),
+      ]);
+      dispatch({
+        type: "loadSuccess",
+        currentMonth: month,
+        categories,
+        transactions,
+        budgets,
+      });
+    } catch (error) {
+      dispatch({
+        type: "loadError",
+        message: error instanceof Error ? error.message : "Неизвестная ошибка",
+      });
+    }
   }, []);
 
+  // Загрузка при входе, сброс при выходе.
   useEffect(() => {
-    load();
-  }, [load]);
+    if (authStatus === "authenticated") {
+      void load();
+    } else if (authStatus === "guest") {
+      dispatch({ type: "reset" });
+    }
+  }, [authStatus, load]);
 
   const actions = useMemo<FinanceActions>(
     () => ({
-      reload: load,
-      addTransaction: (input) =>
-        dispatch({
-          type: "transactionAdd",
-          transaction: { id: createId("t"), ...input },
-        }),
-      updateTransaction: (id, patch) =>
-        dispatch({ type: "transactionUpdate", id, patch }),
-      deleteTransaction: (id) => dispatch({ type: "transactionDelete", id }),
-      addCategory: (input) =>
-        dispatch({
-          type: "categoryAdd",
-          category: {
-            id: createId("cat"),
-            ...input,
-            color: colorForType(input.type),
-          },
-        }),
-      updateCategory: (id, patch) =>
-        dispatch({ type: "categoryUpdate", id, patch }),
-      deleteCategory: (id) => dispatch({ type: "categoryDelete", id }),
-      addBudget: (input) =>
-        dispatch({
-          type: "budgetAdd",
-          budget: {
-            id: createId("b"),
-            ...input,
-            month: state.currentMonth,
-          },
-        }),
-      updateBudget: (id, patch) => dispatch({ type: "budgetUpdate", id, patch }),
-      deleteBudget: (id) => dispatch({ type: "budgetDelete", id }),
+      reload: () => {
+        void load();
+      },
+      addTransaction: async (input) => {
+        const transaction = await createTransactionApi(input);
+        dispatch({ type: "transactionAdd", transaction });
+      },
+      updateTransaction: async (id, input) => {
+        const transaction = await updateTransactionApi(id, input);
+        dispatch({ type: "transactionUpdate", id, transaction });
+      },
+      deleteTransaction: async (id) => {
+        await deleteTransactionApi(id);
+        dispatch({ type: "transactionDelete", id });
+      },
+      addCategory: async (input) => {
+        const category = await createCategoryApi(input);
+        dispatch({ type: "categoryAdd", category });
+      },
+      updateCategory: async (id, input) => {
+        const category = await updateCategoryApi(id, input);
+        dispatch({ type: "categoryUpdate", id, category });
+      },
+      deleteCategory: async (id) => {
+        await deleteCategoryApi(id);
+        dispatch({ type: "categoryDelete", id });
+      },
+      addBudget: async (input) => {
+        const budget = await createBudgetApi(input);
+        dispatch({ type: "budgetAdd", budget });
+      },
+      updateBudget: async (id, input) => {
+        const budget = await updateBudgetApi(id, input);
+        dispatch({ type: "budgetUpdate", id, budget });
+      },
+      deleteBudget: async (id) => {
+        await deleteBudgetApi(id);
+        dispatch({ type: "budgetDelete", id });
+      },
     }),
-    [load, state.currentMonth],
+    [load],
   );
 
   const value = useMemo(() => ({ state, actions }), [state, actions]);

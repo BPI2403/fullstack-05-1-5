@@ -20,7 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
-import { useFinance, useFinanceState } from "@/entities/finance/model/store";
+import {
+  useFinance,
+  useFinanceState,
+} from "@/entities/finance/model/store";
+import { ApiError } from "@/shared/api/client";
 import type { Budget } from "@/entities/budget/model/types";
 import { cn } from "@/shared/lib/utils";
 import { validateBudgetForm, type BudgetFormValues } from "../model/schema";
@@ -45,6 +49,7 @@ export function BudgetFormDialog({
 
   // Диалог монтируется заново при каждом открытии (key в родителе),
   // поэтому значения редактируемого бюджета берутся прямо в useState.
+  const { currentMonth } = useFinanceState();
   const [values, setValues] = useState<BudgetFormValues>(
     editing
       ? { categoryId: editing.categoryId, limit: String(editing.limit) }
@@ -53,6 +58,8 @@ export function BudgetFormDialog({
   const [errors, setErrors] = useState<Partial<
     Record<keyof BudgetFormValues, string>
   > | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [shaking, setShaking] = useState(false);
 
   // Категории расходов, у которых ещё нет бюджета (кроме редактируемого).
@@ -75,23 +82,40 @@ export function BudgetFormDialog({
   const clearError = (field: keyof BudgetFormValues) =>
     setErrors((prev) => (prev ? { ...prev, [field]: undefined } : prev));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const nextErrors = validateBudgetForm(values);
     if (Object.values(nextErrors).some(Boolean)) {
       setErrors(nextErrors);
       setShaking(true);
       return;
     }
-    const input = {
-      categoryId: values.categoryId,
-      limit: Number(values.limit.replace(",", ".")),
-    };
-    if (editing) {
-      updateBudget(editing.id, input);
-    } else {
-      addBudget(input);
+    setSaving(true);
+    setServerError(null);
+    try {
+      const input = {
+        categoryId: values.categoryId,
+        limit: Number(values.limit.replace(",", ".")),
+        month: currentMonth,
+      };
+      if (editing) {
+        await updateBudget(editing.id, input);
+      } else {
+        await addBudget(input);
+      }
+      onOpenChange(false);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.fields?.category_id) {
+          setErrors({ categoryId: error.fields.category_id });
+        } else {
+          setServerError(error.message);
+        }
+      } else {
+        setServerError("Не удалось сохранить бюджет. Попробуйте ещё раз.");
+      }
+    } finally {
+      setSaving(false);
     }
-    onOpenChange(false);
   };
 
   return (
@@ -184,6 +208,12 @@ export function BudgetFormDialog({
               />
             </FormField>
 
+            {serverError ? (
+              <p role="alert" className="animate-fade-in text-xs text-destructive">
+                {serverError}
+              </p>
+            ) : null}
+
             <DialogFooter>
               <Button
                 type="button"
@@ -192,8 +222,12 @@ export function BudgetFormDialog({
               >
                 Отмена
               </Button>
-              <Button type="button" onClick={handleSubmit}>
-                {editing ? "Сохранить" : "Добавить"}
+              <Button type="button" onClick={handleSubmit} disabled={saving}>
+                {saving
+                  ? "Сохраняем…"
+                  : editing
+                    ? "Сохранить"
+                    : "Добавить"}
               </Button>
             </DialogFooter>
           </div>

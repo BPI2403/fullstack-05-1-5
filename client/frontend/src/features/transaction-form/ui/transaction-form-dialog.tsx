@@ -24,6 +24,7 @@ import { useFinance, useFinanceState } from "@/entities/finance/model/store";
 import type { Transaction } from "@/entities/transaction/model/types";
 import type { TransactionType } from "@/entities/transaction/model/types";
 import { cn } from "@/shared/lib/utils";
+import { ApiError } from "@/shared/api/client";
 import {
   toTransactionInput,
   validateTransactionForm,
@@ -74,6 +75,8 @@ export function TransactionFormDialog({
   const [errors, setErrors] = useState<Partial<
     Record<keyof TransactionFormValues, string>
   > | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [shaking, setShaking] = useState(false);
 
 
@@ -96,20 +99,36 @@ export function TransactionFormDialog({
     clearError("categoryId");
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const nextErrors = validateTransactionForm(values);
     if (Object.values(nextErrors).some(Boolean)) {
       setErrors(nextErrors);
       setShaking(true);
       return;
     }
-    const input = toTransactionInput(values);
-    if (editing) {
-      updateTransaction(editing.id, input);
-    } else {
-      addTransaction(input);
+    setSaving(true);
+    setServerError(null);
+    try {
+      const input = toTransactionInput(values);
+      if (editing) {
+        await updateTransaction(editing.id, input);
+      } else {
+        await addTransaction(input);
+      }
+      onOpenChange(false);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.fields?.category_id) {
+          setErrors({ categoryId: error.fields.category_id });
+        } else {
+          setServerError(error.message);
+        }
+      } else {
+        setServerError("Не удалось сохранить операцию. Попробуйте ещё раз.");
+      }
+    } finally {
+      setSaving(false);
     }
-    onOpenChange(false);
   };
 
   return (
@@ -254,6 +273,12 @@ export function TransactionFormDialog({
               />
             </FormField>
 
+            {serverError ? (
+              <p role="alert" className="animate-fade-in text-xs text-destructive">
+                {serverError}
+              </p>
+            ) : null}
+
             <DialogFooter>
               <Button
                 type="button"
@@ -262,8 +287,12 @@ export function TransactionFormDialog({
               >
                 Отмена
               </Button>
-              <Button type="button" onClick={handleSubmit}>
-                {editing ? "Сохранить" : "Добавить"}
+              <Button type="button" onClick={handleSubmit} disabled={saving}>
+                {saving
+                  ? "Сохраняем…"
+                  : editing
+                    ? "Сохранить"
+                    : "Добавить"}
               </Button>
             </DialogFooter>
           </div>

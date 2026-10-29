@@ -23,6 +23,7 @@ import {
 import { useFinance, useFinanceState } from "@/entities/finance/model/store";
 import type { Category, CategoryType } from "@/entities/category/model/types";
 import { cn } from "@/shared/lib/utils";
+import { ApiError } from "@/shared/api/client";
 import { validateCategoryForm, type CategoryFormValues } from "../model/schema";
 
 interface CategoryFormDialogProps {
@@ -59,6 +60,8 @@ export function CategoryFormDialog({
   const [errors, setErrors] = useState<Partial<
     Record<keyof CategoryFormValues, string>
   > | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [shaking, setShaking] = useState(false);
 
 
@@ -68,24 +71,40 @@ export function CategoryFormDialog({
   const clearError = (field: keyof CategoryFormValues) =>
     setErrors((prev) => (prev ? { ...prev, [field]: undefined } : prev));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const nextErrors = validateCategoryForm(values, categories, editing?.id);
     if (Object.values(nextErrors).some(Boolean)) {
       setErrors(nextErrors);
       setShaking(true);
       return;
     }
-    const input = {
-      name: values.name.trim(),
-      type: values.type,
-      icon: values.icon,
-    };
-    if (editing) {
-      updateCategory(editing.id, input);
-    } else {
-      addCategory(input);
+    setSaving(true);
+    setServerError(null);
+    try {
+      const input = {
+        name: values.name.trim(),
+        type: values.type,
+        icon: values.icon,
+      };
+      if (editing) {
+        await updateCategory(editing.id, input);
+      } else {
+        await addCategory(input);
+      }
+      onOpenChange(false);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.fields?.name) {
+          setErrors({ name: error.fields.name });
+        } else {
+          setServerError(error.message);
+        }
+      } else {
+        setServerError("Не удалось сохранить категорию. Попробуйте ещё раз.");
+      }
+    } finally {
+      setSaving(false);
     }
-    onOpenChange(false);
   };
 
   return (
@@ -167,6 +186,12 @@ export function CategoryFormDialog({
               </Select>
             </FormField>
 
+            {serverError ? (
+              <p role="alert" className="animate-fade-in text-xs text-destructive">
+                {serverError}
+              </p>
+            ) : null}
+
             <DialogFooter>
               <Button
                 type="button"
@@ -175,8 +200,12 @@ export function CategoryFormDialog({
               >
                 Отмена
               </Button>
-              <Button type="button" onClick={handleSubmit}>
-                {editing ? "Сохранить" : "Добавить"}
+              <Button type="button" onClick={handleSubmit} disabled={saving}>
+                {saving
+                  ? "Сохраняем…"
+                  : editing
+                    ? "Сохранить"
+                    : "Добавить"}
               </Button>
             </DialogFooter>
           </div>

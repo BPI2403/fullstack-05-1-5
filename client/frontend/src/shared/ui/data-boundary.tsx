@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Skeleton } from "./skeleton";
 import { ErrorState } from "./error-state";
 
-export type DataStatus = "loading" | "ready" | "error";
+export type DataStatus = "idle" | "loading" | "ready" | "error";
 
 interface DataBoundaryProps {
   status: DataStatus;
@@ -31,7 +31,7 @@ export function DataBoundary({
   error,
   children,
 }: DataBoundaryProps) {
-  if (status === "loading") {
+  if (status === "idle" || status === "loading") {
     return <>{skeleton ?? <DefaultSkeleton />}</>;
   }
   if (status === "error") {
